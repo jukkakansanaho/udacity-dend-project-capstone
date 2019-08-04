@@ -13,34 +13,38 @@ After installing python3 + Apache Spark (pyspark) libraries and dependencies, ru
 This Project-Capstone handles World weather data (by Berkeley Earth project: ) and CO2 + SO2 emission data (by Clio Infra). Input data is in "Data Lake": Weather data is in CSV format, emission data is in XLXS format, and CountryCode data is in JSON format. Usually Data Lake stores data in Cloud storage e.g. Amazon AWS. See short descriptions of the data below:
 
 * **data/GlobalLandTemperaturesByCity.csv**: World land temperatures by city
-  Source: https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data/
-  Temperature-data example:
-  ![Temperature-data example](./Udacity-DEND-Project-Capstone-TemperatureData-20190804-1.png)
 
-  NOTE: Please unzip climate-change-earth-surface-temperature-data.zip and move files to /data folder. GlobalLandTemperaturesByCity.csv si used primary in this ETL pipeline.
+  * Source: https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data/
+  * Temperature-data example:
+  * ![Temperature-data example](./Udacity-DEND-Project-Capstone-TemperatureData-20190804-1.png)
+
+  * NOTE: Please unzip climate-change-earth-surface-temperature-data.zip and move files to /data folder. GlobalLandTemperaturesByCity.csv si used primary in this ETL pipeline.
 
 * **data/CO2_Emissions_Capita-historical.xlsx**: CO2 emission data by country
-  Source: https://clio-infra.eu/Indicators/CO2EmissionsperCapita.html
-  => https://datasets.socialhistory.org/dataset.xhtml?persistentId=hdl:10622/DG654S
-  CO2 Emissions per Capita (1500-2000)
-  Last update: 2012-09-01
-  CO2-emission example:
-  ![CO2-data example](./Udacity-DEND-Project-Capstone-CO2Data-20190804-2.png)
+
+  * Source: https://clio-infra.eu/Indicators/CO2EmissionsperCapita.html
+  * => https://datasets.socialhistory.org/dataset.xhtml?persistentId=hdl:10622/DG654S
+  * CO2 Emissions per Capita (1500-2000)
+  * Last update: 2012-09-01
+  * CO2-emission example:
+  * ![CO2-data example](./Udacity-DEND-Project-Capstone-CO2Data-20190804-2.png)
 
 * **data/SO2_Emissions_Capita-historical.xlsx**: SO2 emission data by country
-  Source: https://clio-infra.eu/Indicators/SO2EmissionsperCapita.html
-  => https://datasets.socialhistory.org/dataset.xhtml?persistentId=hdl:10622/IRT0YU
-  SO2 Emissions per Capita (1850-2000)  
-  Last update: 2013-05-18
-  SO2-emission example:
-  ![SO2-data example](./Udacity-DEND-Project-Capstone-SO2Data-20190804-3.png)
+
+  * Source: https://clio-infra.eu/Indicators/SO2EmissionsperCapita.html
+  * => https://datasets.socialhistory.org/dataset.xhtml?persistentId=hdl:10622/IRT0YU
+  * SO2 Emissions per Capita (1850-2000)
+  * Last update: 2013-05-18
+  * SO2-emission example:
+  * ![SO2-data example](./Udacity-DEND-Project-Capstone-SO2Data-20190804-3.png)
 
 * **data/iso-3166-country-codes.json**: country codes (ISO-3166)
-  Source: https://github.com/lukes/ISO-3166-Countries-with-Regional-Codes
-  ISO-3166-1 and ISO-3166-2 Country and Dependent Territories Lists with UN Regional Codes
-  ISO-3166: https://www.iso.org/iso-3166-country-codes.html
-  Country Code example:
-  ![CountryCode-data example](./Udacity-DEND-Project-Capstone-CountryCodesData-20190804-4.png)
+
+  * Source: https://github.com/lukes/ISO-3166-Countries-with-Regional-Codes
+    ISO-3166-1 and ISO-3166-2 Country and Dependent Territories Lists with UN Regional Codes
+  * ISO-3166: https://www.iso.org/iso-3166-country-codes.html
+  * Country Code example:
+  * ![CountryCode-data example](./Udacity-DEND-Project-Capstone-CountryCodesData-20190804-4.png)
 
   Below, some figures about the data set (results after running the `etl.py`):
 
