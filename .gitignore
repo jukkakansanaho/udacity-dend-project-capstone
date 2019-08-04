@@ -1,0 +1,7 @@
+__pycache__
+.DS_Store
+.ipynb_checkpoints/*
+dl.cfg
+data/output_data/*
+data/GlobalLandTemperaturesByCity.csv
+data/GlobalLandTemperaturesByCountry.csv
