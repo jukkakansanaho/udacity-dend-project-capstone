@@ -1,6 +1,6 @@
-_(Udacity: Data Engineering Nano Degree) | jukka.kansanaho@gmail.com | 2019-08-03_
+_(Udacity: Data Engineering Nano Degree) | jukka.kansanaho@gmail.com | 2019-08-14_
 
-# PROJECT-CAPSTONE: World Temperature vs CO2 and SO2 Emissions
+# PROJECT-CAPSTONE: US I94 Immigration Insights
 
 ## Quick start
 
@@ -10,45 +10,55 @@ After installing python3 + Apache Spark (pyspark) libraries and dependencies, ru
 
 ## Overview
 
-This Project-Capstone handles World weather data (by Berkeley Earth project: ) and CO2 + SO2 emission data (by Clio Infra). Input data is in "Data Lake": Weather data is in CSV format, emission data is in XLXS format, and CountryCode data is in JSON format. Usually Data Lake stores data in Cloud storage e.g. Amazon AWS. See short descriptions of the data below:
+This Project-Capstone handles US I94 immigration data and uses airport code data and country code data as a support. Input data is in "Data Lake": Immigration data is in SAS7BDAT format, Airport data is in CSV format, and CountryCode data is in JSON format. Usually Data Lake stores data in Cloud storage e.g. Amazon AWS.
 
-* **data/GlobalLandTemperaturesByCity.csv**: World land temperatures by city
+See short descriptions of the data below:
 
-  * Source: https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data/
-  * Temperature-data example:
-  * ![Temperature-data example](./Udacity-DEND-Project-Capstone-TemperatureData-20190804-1.png)
+* **data/18-83510-I94-Data-2016/**: US I94 immigration data from 2016 (Jan-Dec).
 
-  * NOTE: Please unzip climate-change-earth-surface-temperature-data.zip and move files to /data folder. GlobalLandTemperaturesByCity.csv si used primary in this ETL pipeline.
+  * Source: US National Tourism and Trade Office https://travel.trade.gov/research/reports/i94/historical/2016.html
+  * Description: I94_SAS_Labels_Descriptions.txt file contains descriptions for the I94 data.
+    * I94 dataset has SAS7BDAT file per each month of the year (e.g. i94_jan16_sub.sas7bdat).
+    * Each file contains about 3M rows
+    * Data has 28 columns containing information about event date, arriving person, airport, airline, etc.
+  * I94 immigration data example:
+  * ![I94-immigration-data example](./Udacity-DEND-Project-Capstone-I94ImmigrationData-20190812-2.png)
+  * NOTE: This data is behind a pay wall and need to be purchased to get access. Data is available for Udacity DEND course.
 
-* **data/CO2_Emissions_Capita-historical.xlsx**: CO2 emission data by country
+  * **data/i94_airport_codes.xlsx**: Airport codes and related cities defined in I94 data description file.
 
-  * Source: https://clio-infra.eu/Indicators/CO2EmissionsperCapita.html
-  * => https://datasets.socialhistory.org/dataset.xhtml?persistentId=hdl:10622/DG654S
-  * CO2 Emissions per Capita (1500-2000)
-  * Last update: 2012-09-01
-  * CO2-emission example:
-  * ![CO2-data example](./Udacity-DEND-Project-Capstone-CO2Data-20190804-2.png)
+    * Source: https://travel.trade.gov/research/reports/i94/historical/2016.html
+    * Description: I94 Airport codes data contains information about different airports around the world.
+      * Columns: i94port, i94_airport_name
+      * Data has 660 rows and 2 columns.
+    * I94 Airport Code example:
+    * ![I94-AirportCode-data example](./Udacity-DEND-Project-Capstone-I94AirportCodeData-20190813-4.png)
 
-* **data/SO2_Emissions_Capita-historical.xlsx**: SO2 emission data by country
+  * **data/i94_country_codes.xlsx**: Country codes defined in US I94 Immigration data description file.
 
-  * Source: https://clio-infra.eu/Indicators/SO2EmissionsperCapita.html
-  * => https://datasets.socialhistory.org/dataset.xhtml?persistentId=hdl:10622/IRT0YU
-  * SO2 Emissions per Capita (1850-2000)
-  * Last update: 2013-05-18
-  * SO2-emission example:
-  * ![SO2-data example](./Udacity-DEND-Project-Capstone-SO2Data-20190804-3.png)
+    * Source: https://travel.trade.gov/research/reports/i94/historical/2016.html
+    * Description: I94 Country codes data contains information about countries people come to US from.
+      * Columns: i94cit, i94_country_code
+      * Data has 289 rows and 2 columns.
+    * I94 Country Code example:
+    * ![I94-CountryCode-data example](./Udacity-DEND-Project-Capstone-I94CountryCodeData-20190813-5.png)
 
-* **data/iso-3166-country-codes.json**: country codes (ISO-3166)
+  * **data/airport-codes.csv**: Airport codes and related cities.
 
-  * Source: https://github.com/lukes/ISO-3166-Countries-with-Regional-Codes
-    ISO-3166-1 and ISO-3166-2 Country and Dependent Territories Lists with UN Regional Codes
-  * ISO-3166: https://www.iso.org/iso-3166-country-codes.html
-  * Country Code example:
-  * ![CountryCode-data example](./Udacity-DEND-Project-Capstone-CountryCodesData-20190804-4.png)
+    * Source: https://datahub.io/core/airport-codes#data
+    * Description: Airpot codes data contains information about different airports around the world.
+      * Columns: Airport code, name, type, location, etc.
+      * Data has 48304 rows and 12 columns.
+    * Airport Code example:
+    * ![IATA-AirportCode-data example](./Udacity-DEND-Project-Capstone-AirportCodeData-20190812-3.png)
 
-  Below, some figures about the data set (results after running the `etl.py`):
+  * **data/iso-3166-country-codes.json**: World country codes (ISO-3166)
 
-* ...
+    * Source: https://github.com/lukes/ISO-3166-Countries-with-Regional-Codes
+      ISO-3166-1 and ISO-3166-2 Country and Dependent Territories Lists with UN Regional Codes
+    * ISO-3166: https://www.iso.org/iso-3166-country-codes.html
+    * Country Code example:
+    * ![ISO-CountryCode-data example](./Udacity-DEND-Project-Capstone-CountryCodesData-20190804-4.png)
 
 Project builds an ETL pipeline (Extract, Transform, Load) to Extract data from input files into staging tables, process the data into fact and dimension tables. As technologies, Project-Capstone uses python and Apache Spark. Input data can be stored e.g. in Amazon AWS S3 or locally. Output parquet files can be written e.g. back to S3 or to local file storage.
 
@@ -61,9 +71,9 @@ The Fact Table can be used to answer for example the following question: Is ther
 
 DB schema is the following:
 
-![WeatherAndEmissionDB schema as ER Diagram](./Udacity-DEND-Project-Capstone-ERD-20190804v1.png)
+![I94-ImmigrationInsights data schema as ER Diagram](./Udacity-DEND-Project-Capstone-ERD-20190813v6.png)
 
-_*WeatherAndEmissionDB schema as ER Diagram.*_
+_*I94-ImmigrationInsights schema as ER Diagram.*_
 
 ### Purpose of the database and ETL pipeline
 
@@ -125,4 +135,4 @@ Output: ...
 
 ## Summary
 
-Project-Capstone provides tools to automatically process, clean, analyze weather and emission data in a flexible way and help answering questions like "Is there correlation between country emissions and world temperature?"
+Project-Capstone provides tools to automatically process, clean, analyze US I94 Immigration data in a flexible way and help answering questions like "Which US airports people used most to immigrate US?"
