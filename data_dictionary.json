@@ -1,0 +1,162 @@
+{
+  "tables": [
+    {
+      "table": "admissions",
+      "table_description":
+        "Dimension table. This data was extracted from original I94 Immigrations data to separate immigrant specific data from other data.",
+      "fields": [
+        {
+          "field_name": "admission_nbr",
+          "field_description":
+            "US I94 Admission number (admnum) given to a person when entrying the country."
+        },
+        {
+          "field_name": "country_code",
+          "field_description":
+            "3 letter country code (i94cit or i94res) used in I94 data to identify the immigrant country."
+        },
+        {
+          "field_name": "age",
+          "field_description": "Person's age (i94bir) defined in I94 data."
+        },
+        {
+          "field_name": "visa_type",
+          "field_description":
+            "Immigrant's visa type (visatype). Class of admission legally admitting the non-immigrant to temporarily stay in U.S."
+        },
+        {
+          "field_name": "visa_code",
+          "field_description":
+            "Immigrant's visa code (i94visa). Potential values: 1=Business, 2=Business, 3=Student."
+        },
+        {
+          "field_name": "person_gender",
+          "field_description":
+            "Immigrant's gender (non-US citizens). Potential values: M=man, F=female, NA=Not Available"
+        }
+      ]
+    },
+    {
+      "table": "countries",
+      "table_description":
+        "Dimension table. This data was copied and further processed from original I94 Immigrations data Description file to describe immigrant home countries. I94 Country Codes are different than defined in ISO-3166 standard.",
+      "fields": [
+        {
+          "field_name": "country_code",
+          "field_description":
+            "US I94 Country Code (i94cit or i94res). NOTE: these codes are different than defined in ISO-3166 standard for country codes."
+        },
+        {
+          "field_name": "country_name",
+          "field_description":
+            "3 letter country code (i94cit or i94res) used in I94 data to identify the immigrant country."
+        }
+      ]
+    },
+    {
+      "table": "airports",
+      "table_description":
+        "Dimension table. This data was extracted from original I94 Immigrations data Description file to describe airports used in immigrations. I94 Airport codes are different than used world wide e.g. IATA codes.",
+      "fields": [
+        {
+          "field_name": "airport_id",
+          "field_description":
+            "US I94 Airport ID (i94port). NOTE: these codes are different than used world wide e.g. IATA standard for airport ids."
+        },
+        {
+          "field_name": "airport_name",
+          "field_description": "Name of the airport used in I94 data."
+        },
+        {
+          "field_name": "airport_state",
+          "field_description":
+            "US state (or other country name) where the airport is located. E.g. CA"
+        }
+      ]
+    },
+    {
+      "table": "time",
+      "table_description":
+        "Dimension table. This data has been extracted from original I94 Immigrations data to describe the immigrations time events.",
+      "fields": [
+        {
+          "field_name": "arrival_ts",
+          "field_description":
+            "Timestamp of day when immigrant was granted access to US. E.g. 2016-01-01"
+        },
+        {
+          "field_name": "day",
+          "field_description": "Day (of the month) of immigration. E.g. 1"
+        },
+        {
+          "field_name": "week",
+          "field_description": "Week (of the year) of immigration. E.g. 1"
+        },
+        {
+          "field_name": "month",
+          "field_description": "Month (of the year) of immigration. E.g. 1"
+        },
+        {
+          "field_name": "year",
+          "field_description": "Year of immigration. E.g. 2016"
+        },
+        {
+          "field_name": "weekday",
+          "field_description":
+            "Day (of the week) of immigration. E.g. 1 (Monday)"
+        }
+      ]
+    },
+    {
+      "table": "immigrations",
+      "table_description":
+        "Fact table. This data has been extracted from original I94 Immigrations data to bring together I94 Immigrations data.",
+      "fields": [
+        {
+          "field_name": "immigrations_id",
+          "field_description":
+            "Primary key. Generated ID for the immigration event."
+        },
+        {
+          "field_name": "arrival_ts",
+          "field_description":
+            "Secondary key to time-table. Timestamo for the immigration event. E.g. 2016-01-01 00:00:00"
+        },
+        {
+          "field_name": "airport_id",
+          "field_description":
+            "Secondary key to airports-table. Identifies immigration airport."
+        },
+        {
+          "field_name": "country_code",
+          "field_description":
+            "Secondary key to countries-table. Identifies immigrant's home country."
+        },
+        {
+          "field_name": "admission_nbr",
+          "field_description":
+            "Secondary key to admisisons-table. Identifies immigrant admission event."
+        },
+        {
+          "field_name": "arrival_mode",
+          "field_description":
+            "The mode immigrant entried US. Potential values: 1=Air, 2=Sea, 3=Land, 4=Not reported."
+        },
+        {
+          "field_name": "departure_date",
+          "field_description":
+            "Timestamp of the day the immigrant left US. May be empty (NA) which means that the prsons has not left US."
+        },
+        {
+          "field_name": "airline",
+          "field_description": "Airline immigrant used when entrying US."
+        },
+        {
+          "field_name": "flight_nbr",
+          "field_description":
+            "Airline flight number immigrant used when etrying US."
+        }
+      ]
+    }
+  ]
+}
