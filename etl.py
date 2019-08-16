@@ -372,6 +372,7 @@ def process_admissions_data(spark, PATHS, i94_df_spark_clean, start_time):
         FROM admissions_table_DF
         ORDER BY country_code
     """)
+
     print("SCHEMA:")
     admissions_table.printSchema()
     print("DATA EXAMPLES:")
@@ -408,7 +409,7 @@ def process_countries_data(spark, PATHS, country_codes_i94_df_spark, start_time)
                         Used to name parquet files.
 
     Output:
-    * admissions_table  -- directory with parquet files
+    * countries_table  -- directory with parquet files
                             stored in output data path.
     """
     start_local = datetime.now()
@@ -444,8 +445,58 @@ def process_countries_data(spark, PATHS, country_codes_i94_df_spark, start_time)
 
     return countries_table_df
 
-def process_airport_data():
-    pass
+def process_airport_data(spark, PATHS, airport_codes_i94_df_spark, start_time):
+    """Load input data (airport_codes_clean),
+        process the data to extract airports table and
+        store the prepered data to parquet files.
+
+    Keyword arguments:
+    * spark             -- reference to Spark session.
+    * PATHS             -- paths for input and output data.
+    * start_str         -- Datetime when the pipeline was started.
+                        Used to name parquet files.
+
+    Output:
+    * airports_table  -- directory with parquet files
+                            stored in output data path.
+    """
+    start_local = datetime.now()
+    print("Creating airports_table...")
+    # Create table + query
+    airport_codes_i94_df_spark.createOrReplaceTempView("airports_table_DF")
+    airports_table = spark.sql("""
+        SELECT DISTINCT  i94_port          AS airport_id,
+                         i94_airport_name  AS airport_name,
+                         i94_airport_state AS airport_state
+        FROM airports_table_DF             AS airports
+        ORDER BY airport_name
+    """)
+
+    print("SCHEMA:")
+    airports_table.printSchema()
+    print("DATA EXAMPLES:")
+    airports_table.show(2, truncate=False)
+    # --------------------------------------------------------
+    print("Writing parquet files ...")
+    # Write DF to parquet file:
+    airports_table_path = PATHS["output_data"] \
+                                + "airports_table.parquet" \
+                                + "_" + start_time
+    print(f"OUTPUT: {airports_table_path}")
+    airports_table.write.mode("overwrite")\
+                        .parquet(airports_table_path)
+    print("Writing DONE.")
+    print("Writing airports_table parquet files DONE.")
+    # --------------------------------------------------------
+    # Read parquet file back to Spark:
+    airports_table_df = spark.read\
+                             .parquet(airports_table_path)
+    # --------------------------------------------------------
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"Creating airports_table DONE in: {total_local}\n")
+
+    return airports_table_df
 
 def process_time_data():
     pass
@@ -506,17 +557,20 @@ def main():
                                         start_str)
 
     # Process Dimension tables.
-    admissions_table_df = process_admissions_data( spark, \
-                                                PATHS, \
-                                                i94_df_spark_clean, \
-                                                start_str)
+    admissions_table_df = process_admissions_data(spark, \
+                                                  PATHS, \
+                                                  i94_df_spark_clean, \
+                                                  start_str)
 
     countries_table_df = process_countries_data(spark, \
                                                 PATHS, \
                                                 country_codes_i94_df_spark, \
                                                 start_str)
 
-    #airports_table = process_airport_data(spark, PATHS, start_str)
+    airports_table_df = process_airport_data(spark, \
+                                             PATHS, \
+                                             airport_codes_i94_df_spark, \
+                                             start_str)
     #time_table = process_time_data(spark, PATHS, start_str)
 
     # Process Fact table.
