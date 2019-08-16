@@ -573,8 +573,103 @@ def process_time_data(spark, PATHS, i94_df_spark_clean, start_time):
 
     return time_table_df, i94_df_spark_clean
 
-def process_immigrations_data():
-    pass
+def process_immigrations_data(spark, \
+                              PATHS, \
+                              i94_df_spark_clean, \
+                              country_codes_i94_df_spark, \
+                              airport_codes_i94_df_spark, \
+                              start_time):
+    """Load input data (i94_clean, country_code_clean,
+        airport_codes_clean),
+        process the data to extract immigrations table and
+        store the prepered data to parquet files.
+
+    Keyword arguments:
+    * spark                 -- reference to Spark session.
+    * PATHS                 -- paths for input and output data.
+    * i94_df_spark_clean    -- cleaned i94 Spark dataframe
+    * country_codes_i94_df_spark -- cleaned i94 country codes dataframe
+    * airport_codes_i94_df_spark -- cleaned i94 airport codes dataframe
+    * start_str             -- Datetime when the pipeline was started.
+                                Used to name parquet files.
+
+    Output:
+    * immigrations_table_df -- directory with parquet files
+                                stored in output data path.
+    """
+    start_local = datetime.now()
+    print("Creating immigrations_table query...")
+    # Join dataframes
+    i94_df_spark_joined = i94_df_spark_clean\
+        .join(country_codes_i94_df_spark, \
+            (i94_df_spark_clean.i94cit == \
+                    country_codes_i94_df_spark.i94_cit))\
+        .join(airport_codes_i94_df_spark, \
+            (i94_df_spark_clean.i94port == \
+                    airport_codes_i94_df_spark.i94_port))
+    # --------------------------------------------------------
+    # Add new arrival_ts column
+    print("Creating new immigration_id column...")
+    i94_df_spark_joined = i94_df_spark_joined\
+                            .withColumn("immigration_id", \
+                                        monotonically_increasing_id())
+    print("New column DONE.")
+    # --------------------------------------------------------
+    # Create table + query
+    @udf(t.TimestampType())
+    def get_timestamp2 (depdate):
+        if depdate == "null":
+            depdate_int = 0
+        else:
+            depdate_int = int(depdate)
+        return (datetime(1960,1,1) + timedelta(days=depdate_int))
+
+    i94_df_spark_joined = i94_df_spark_joined\
+                        .withColumn("departure_date", \
+                            get_timestamp2(i94_df_spark_joined.depdate))
+    print("New column creation DONE.")
+    # --------------------------------------------------------
+    print("Creating immigrations_table query...")
+    # Create table + query
+    i94_df_spark_joined.createOrReplaceTempView("immigrations_table_DF")
+    immigrations_table = spark.sql("""
+        SELECT DISTINCT  immigration_id AS immigration_id,
+                         arrival_ts     AS arrival_ts,
+                         i94_port       AS airport_id,
+                         i94_cit        AS country_code,
+                         admnum         AS admission_nbr,
+                         i94mode        AS arrival_mode,
+                         departure_date AS departure_date,
+                         airline        AS airline,
+                         fltno          AS flight_nbr
+
+        FROM immigrations_table_DF immigrants
+        ORDER BY arrival_ts
+    """)
+
+    print("SCHEMA:")
+    immigrations_table.printSchema()
+    #print("DATA EXAMPLES:")
+    #time_table.show(2, truncate=False)
+    # --------------------------------------------------------
+    print("Writing parquet files ...")
+    # Write DF to parquet file:
+    immigrations_table_path = PATHS["output_data"] \
+                                    + "immigrations_table.parquet" \
+                                    + "_" + start_time
+    print(f"OUTPUT: {immigrations_table_path}")
+    immigrations_table.write.mode("overwrite")\
+                            .parquet(immigrations_table_path)
+    print("Writing immigrations_table parquet files DONE.")
+    # --------------------------------------------------------
+    # Read parquet file back to Spark:
+    immigrations_table_df = spark.read.parquet(immigrations_table_path)
+    # --------------------------------------------------------
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"Creating immigrations_table DONE in: {total_local}\n")
+
+    return immigrations_table_df
 
 def main():
     """Load input data (I94 Immigration data) from input_data path,
@@ -629,28 +724,38 @@ def main():
                                         start_str)
 
     # Process Dimension tables.
-    admissions_table_df = process_admissions_data(spark, \
-                                                  PATHS, \
-                                                  i94_df_spark_clean, \
-                                                  start_str)
+    admissions_table_df = process_admissions_data(\
+                                            spark, \
+                                            PATHS, \
+                                            i94_df_spark_clean, \
+                                            start_str)
 
-    countries_table_df = process_countries_data(spark, \
-                                                PATHS, \
-                                                country_codes_i94_df_spark, \
-                                                start_str)
+    countries_table_df = process_countries_data(\
+                                            spark, \
+                                            PATHS, \
+                                            country_codes_i94_df_spark, \
+                                            start_str)
 
-    airports_table_df = process_airport_data(spark, \
-                                             PATHS, \
-                                             airport_codes_i94_df_spark, \
-                                             start_str)
+    airports_table_df = process_airport_data(\
+                                            spark, \
+                                            PATHS, \
+                                            airport_codes_i94_df_spark, \
+                                            start_str)
 
-    time_table_df, i94_df_spark_clean = process_time_data(  spark, \
-                                                            PATHS, \
-                                                            i94_df_spark_clean, \
-                                                            start_str)
+    time_table_df, i94_df_spark_clean = process_time_data( \
+                                            spark, \
+                                            PATHS, \
+                                            i94_df_spark_clean, \
+                                            start_str)
 
     # Process Fact table.
-    #immigrations_table = process_immigrations_data(spark, start_str):
+    immigrations_table = process_immigrations_data( \
+                                    spark,
+                                    PATHS, \
+                                    i94_df_spark_clean, \
+                                    country_codes_i94_df_spark, \
+                                    airport_codes_i94_df_spark, \
+                                    start_str)
     # --------------------------------------------------------
     print("Finished the ETL pipeline processing.")
     print("ALL DONE.")
