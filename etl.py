@@ -122,6 +122,173 @@ def process_i94_data(spark, PATHS, start_time):
 
     return i94_df_spark
 
+def process_i94_airport_data(spark, PATHS, start_time):
+    """Load input data (i94 airports) from input path,
+        read the data to Spark and
+        store the data to parquet staging files.
+
+    Keyword arguments:
+    * spark             -- reference to Spark session.
+    * PATHS             -- paths for input and output data.
+    * start_time        -- Datetime when the pipeline was started.
+                            Used for name parquet files.
+
+    Output:
+    * i94_airport_staging_table -- directory with parquet files
+                                    stored in output data path.
+    """
+    print("Processing i94_airport data ...")
+    # Read I94 Airport codes data from XLS:
+    airport_codes_i94_df = pd.read_excel(PATHS["airport_codes_i94"], header=0, index_col=0)
+    # --------------------------------------------------------
+    # Cleaning I94 Airport data first
+    print("Cleaning I94 airport data...")
+    ac = {  "i94port_clean": [],
+            "i94_airport_name_clean": [],
+            "i94_state_clean": []
+        }
+    codes = []
+    names = []
+    states = []
+    for index, row in airport_codes_i94_df.iterrows():
+        y = re.sub("'", "", index)
+        x = re.sub("'", "", row[0])
+        z = re.sub("'", "", row[0]).split(",")
+        y = y.strip()
+        z[0] = z[0].strip()
+
+        if len(z) == 2:
+            codes.append(y)
+            names.append(z[0])
+            z[1] = z[1].strip()
+            states.append(z[1])
+        else:
+            codes.append(y)
+            names.append(z[0])
+            states.append("NaN")
+
+    ac["i94port_clean"] = codes
+    ac["i94_airport_name_clean"] = names
+    ac["i94_state_clean"] = states
+
+    airport_codes_i94_df_clean = pd.DataFrame.from_dict(ac)
+    print("Cleaning I94 airport data DONE.")
+    # --------------------------------------------------------
+    # Writing clean data to CSV (might be needed at some point)
+    print("Writing I94 airport data to CSV...")
+    ac_path = PATHS["input_data"] + "/airport_codes_i94_clean.csv"
+    airport_codes_i94_df_clean.to_csv(ac_path, sep=',')
+    print("Writing I94 airport data to CSV DONE.")
+    # --------------------------------------------------------
+    # Read data to Spark
+    print("Reading I94 airport data to Spark...")
+    airport_codes_i94_schema = t.StructType([
+                    t.StructField("i94_port", t.StringType(), False),
+                    t.StructField("i94_airport_name", t.StringType(), False),
+                    t.StructField("i94_airport_state", t.StringType(), False)
+                ])
+    airport_codes_i94_df_spark = spark.createDataFrame(\
+                            airport_codes_i94_df_clean, \
+                            schema=airport_codes_i94_schema)
+    # --------------------------------------------------------
+    # Print schema and data snippet
+    print("SCHEMA:")
+    airport_codes_i94_df_spark.printSchema()
+    print("DATA EXAMPLES:")
+    airport_codes_i94_df_spark.show(2, truncate=False)
+    # --------------------------------------------------------
+    # Write data to parquet file:
+    airport_codes_i94_df_path = PATHS["output_data"] \
+                                + "airport_codes_i94_staging.parquet" \
+                                + "_" + start_time
+    print(f"OUTPUT: {airport_codes_i94_df_path}")
+    print("Writing parquet files ...")
+    airport_codes_i94_df_spark.write.mode("overwrite")\
+                                .parquet(airport_codes_i94_df_path)
+    print("Writing i94 airport staging files DONE.")
+
+    # Read parquet file back to Spark:
+    airport_codes_i94_df_spark = spark.read\
+                                .parquet(airport_codes_i94_df_path)
+
+    return airport_codes_i94_df_spark
+
+def process_i94_country_code_data(spark, PATHS, start_time):
+    """Load input data (i94 Country Codes) from input path,
+        read the data to Spark and
+        store the data to parquet staging files.
+
+    Keyword arguments:
+    * spark                 -- reference to Spark session.
+    * PATHS                 -- paths for input and output data.
+    * start_time            -- Datetime when the pipeline was started.
+                                Used for name parquet files.
+
+    Output:
+    * i94_country_codes_staging_table -- directory with parquet files
+                                        stored in output data path.
+    """
+    print("Processing i94 Country Codes data ...")
+    # Read I94 Country codes data from XLS:
+    country_codes_i94_df = pd.read_excel(PATHS["country_codes_i94"], \
+                                        header=0, index_col=0)
+    # --------------------------------------------------------
+    # Cleaning I94 Country Code data first
+    cc = {"i94cit_clean": [],
+          "i94_country_name_clean": []
+          }
+    ccodes = []
+    cnames = []
+
+    for index, row in country_codes_i94_df.iterrows():
+        x = re.sub("'", "", row[0]).strip()
+        ccodes.append(index)
+        cnames.append(x)
+
+    cc["i94cit_clean"] = ccodes
+    cc["i94_country_name_clean"] = cnames
+
+    country_codes_i94_df_clean = pd.DataFrame.from_dict(cc)
+    # --------------------------------------------------------
+    # Writing clean data to CSV (might be needed at some point)
+    print("Writing I94 Country Code data to CSV...")
+    cc_path = PATHS["input_data"] + "/country_codes_i94_clean.csv"
+    country_codes_i94_df_clean.to_csv(cc_path, sep=',')
+    print("Writing I94 Country Code data to CSV DONE.")
+    print("Cleaning I94 Country Code data DONE.")
+    # --------------------------------------------------------
+    # Read data to Spark
+    print("Reading I94 Country Code data to Spark...")
+    country_codes_i94_schema = t.StructType([
+                t.StructField("i94_cit", t.StringType(), False),
+                t.StructField("i94_country_name", t.StringType(), False)
+            ])
+    country_codes_i94_df_spark = spark.createDataFrame(\
+                                country_codes_i94_df_clean, \
+                                schema=country_codes_i94_schema)
+    # --------------------------------------------------------
+    # Print schema and data snippet
+    print("SCHEMA:")
+    country_codes_i94_df_spark.printSchema()
+    print("DATA EXAMPLES:")
+    country_codes_i94_df_spark.show(2, truncate=False)
+    # --------------------------------------------------------
+    # Write i94 Country data to parquet file:
+    country_codes_i94_df_path = PATHS["output_data"] \
+                                + "country_codes_i94_staging.parquet" \
+                                + "_" + start_time
+    print(f"OUTPUT: {country_codes_i94_df_path}")
+    print("Writing parquet files ...")
+    country_codes_i94_df_spark.write.mode("overwrite")\
+                                .parquet(country_codes_i94_df_path)
+    print("Writing i94 Country Code staging files DONE.")
+    # --------------------------------------------------------
+    # Read parquet file back to Spark:
+    country_codes_i94_df_spark = spark.read.\
+                                 parquet(country_codes_i94_df_path)
+
+    return country_codes_i94_df_spark
+
 def process_admissions_data(spark, PATHS, start_str):
     """Load input data (i94) from input path,
         process the data to extract admissions table and
@@ -191,6 +358,8 @@ def main():
     # --------------------------------------------------------
     # Process input data to staging tables.
     i94_df_spark = process_i94_data(spark, PATHS, start_str)
+    airport_codes_i94_df_spark = process_i94_airport_data(spark, PATHS, start_str)
+    country_codes_i94_df_spark = process_i94_country_code_data(spark, PATHS, start_str)
     # --------------------------------------------------------
     # Process Dimension tables.
     #admissions_table = process_admissions_data(spark, PATHS, start_str)
