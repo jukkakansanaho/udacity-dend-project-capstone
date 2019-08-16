@@ -344,7 +344,7 @@ def clean_i94_data(spark, PATHS, i94_df_spark, start_time):
     return i94_df_spark_clean
 
 def process_admissions_data(spark, PATHS, i94_df_spark_clean, start_time):
-    """Load input data (i94_clean) from input path,
+    """Load input data (i94_clean),
         process the data to extract admissions table and
         store the prepered data to parquet files.
 
@@ -383,7 +383,8 @@ def process_admissions_data(spark, PATHS, i94_df_spark_clean, start_time):
                             + "admissions_table.parquet" \
                             + "_" + start_time
     print(f"OUTPUT: {admissions_table_path}")
-    admissions_table.write.mode("overwrite").parquet(admissions_table_path)
+    admissions_table.write.mode("overwrite")\
+                        .parquet(admissions_table_path)
     print("Writing admissions_table parquet files DONE.")
     # --------------------------------------------------------
     # Read parquet file back to Spark:
@@ -395,8 +396,53 @@ def process_admissions_data(spark, PATHS, i94_df_spark_clean, start_time):
 
     return admissions_table_df
 
-def process_countries_data():
-    pass
+def process_countries_data(spark, PATHS, country_codes_i94_df_spark, start_time):
+    """Load input data (country_codes_clean),
+        process the data to extract countries table and
+        store the prepered data to parquet files.
+
+    Keyword arguments:
+    * spark             -- reference to Spark session.
+    * PATHS             -- paths for input and output data.
+    * start_str         -- Datetime when the pipeline was started.
+                        Used to name parquet files.
+
+    Output:
+    * admissions_table  -- directory with parquet files
+                            stored in output data path.
+    """
+    start_local = datetime.now()
+    print("Creating countries_table...")
+    # Create table + query
+    country_codes_i94_df_spark.createOrReplaceTempView("countries_table_DF")
+    countries_table = spark.sql("""
+        SELECT  DISTINCT i94_cit          AS country_code,
+                         i94_country_name AS country_name
+        FROM countries_table_DF           AS countries
+        ORDER BY country_name
+    """)
+
+    print("SCHEMA:")
+    countries_table.printSchema()
+    print("DATA EXAMPLES:")
+    countries_table.show(2, truncate=False)
+    # --------------------------------------------------------
+    print("Writing parquet files ...")
+    # Write DF to parquet file:
+    countries_table_path = PATHS["output_data"] + "countries_table.parquet" + "_" + start_time
+    print(f"OUTPUT: {countries_table_path}")
+    countries_table.write.mode("overwrite").parquet(countries_table_path)
+    print("Writing DONE.")
+    print("Writing countries_table parquet files DONE.")
+    # --------------------------------------------------------
+    # Read parquet file back to Spark:
+    countries_table_df = spark.read.parquet(countries_table_path)
+    # --------------------------------------------------------
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"Creating countries_table DONE in: {total_local}\n")
+
+    return countries_table_df
 
 def process_airport_data():
     pass
@@ -464,7 +510,12 @@ def main():
                                                 PATHS, \
                                                 i94_df_spark_clean, \
                                                 start_str)
-    #countries_table = process_countries_data(spark, PATHS, start_str)
+
+    countries_table_df = process_countries_data(spark, \
+                                                PATHS, \
+                                                country_codes_i94_df_spark, \
+                                                start_str)
+
     #airports_table = process_airport_data(spark, PATHS, start_str)
     #time_table = process_time_data(spark, PATHS, start_str)
 
@@ -477,7 +528,7 @@ def main():
     stop = datetime.now()
     print("FINISHED ETL pipeline (to process song_data and log_data) at {}"\
             .format(stop))
-    print("TIME: {}".format(stop-start))
+    print("TOTAL TIME: {}".format(stop-start))
 
 if __name__ == "__main__":
     main()
