@@ -96,6 +96,7 @@ def process_i94_data(spark, PATHS, start_time):
     * i94_staging_table -- directory with parquet files
                             stored in output data path.
     """
+    start_local = datetime.now()
     print("Processing i94 data ...")
     # Read data to Spark
     i94_df_spark =spark.read\
@@ -118,7 +119,13 @@ def process_i94_data(spark, PATHS, start_time):
     print("Writing i94 staging files DONE.\n")
 
     # Read parquet file back to Spark:
+    print("Reading parquet files back to Spark...")
     i94_df_spark = spark.read.parquet(i94_df_path)
+    print("Reading parquet files back to Spark DONE.")
+
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"I94 data processing DONE in: {total_local}\n")
 
     return i94_df_spark
 
@@ -137,9 +144,11 @@ def process_i94_airport_data(spark, PATHS, start_time):
     * i94_airport_staging_table -- directory with parquet files
                                     stored in output data path.
     """
+    start_local = datetime.now()
     print("Processing i94_airport data ...")
     # Read I94 Airport codes data from XLS:
-    airport_codes_i94_df = pd.read_excel(PATHS["airport_codes_i94"], header=0, index_col=0)
+    airport_codes_i94_df = pd.read_excel(PATHS["airport_codes_i94"], \
+                                            header=0, index_col=0)
     # --------------------------------------------------------
     # Cleaning I94 Airport data first
     print("Cleaning I94 airport data...")
@@ -208,8 +217,14 @@ def process_i94_airport_data(spark, PATHS, start_time):
     print("Writing i94 airport staging files DONE.")
 
     # Read parquet file back to Spark:
+    print("Reading parquet files back to Spark")
     airport_codes_i94_df_spark = spark.read\
                                 .parquet(airport_codes_i94_df_path)
+    print("Reading parquet files back to Spark DONE.")
+
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"I94 Airport code processing DONE in: {total_local}\n")
 
     return airport_codes_i94_df_spark
 
@@ -228,6 +243,7 @@ def process_i94_country_code_data(spark, PATHS, start_time):
     * i94_country_codes_staging_table -- directory with parquet files
                                         stored in output data path.
     """
+    start_local = datetime.now()
     print("Processing i94 Country Codes data ...")
     # Read I94 Country codes data from XLS:
     country_codes_i94_df = pd.read_excel(PATHS["country_codes_i94"], \
@@ -284,13 +300,51 @@ def process_i94_country_code_data(spark, PATHS, start_time):
     print("Writing i94 Country Code staging files DONE.")
     # --------------------------------------------------------
     # Read parquet file back to Spark:
+    print("Reading parquet files back to Spark... ")
     country_codes_i94_df_spark = spark.read.\
                                  parquet(country_codes_i94_df_path)
+    print("Reading parquet files back to Spark DONE.")
+    # --------------------------------------------------------
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"I94 Airport code processing DONE in: {total_local}\n")
 
     return country_codes_i94_df_spark
 
-def process_admissions_data(spark, PATHS, start_str):
-    """Load input data (i94) from input path,
+def clean_i94_data(spark, PATHS, i94_df_spark, start_time):
+    """Clean i94 data - fill-in empty/null values with "NA"s or 0s.
+
+    Keyword arguments:
+    * spark              -- reference to Spark session.
+    * PATHS              -- paths for input and output data.
+    * start_str          -- Datetime when the pipeline was started.
+                        Used to name parquet files.
+
+    Output:
+    * i94_df_spark_clean -- clean Spark DataFrame.
+    """
+    start_local = datetime.now()
+    print("Cleaning i94 data...")
+    # Filling-in empty/null data with "NA"s or 0's
+    i94_df_spark_clean = i94_df_spark\
+        .na.fill({'i94mode': 0.0, 'i94addr': 'NA','depdate': 0.0, \
+            'i94bir': 'NA', 'i94visa': 0.0, 'count': 0.0, \
+            'dtadfile': 'NA', 'visapost': 'NA', 'occup': 'NA', \
+            'entdepa': 'NA', 'entdepd': 'NA', 'entdepu': 'NA', \
+            'matflag': 'NA', 'biryear': 0.0, 'dtaddto': 'NA', \
+            'gender': 'NA', 'insnum': 'NA', 'airline': 'NA', \
+            'admnum': 0.0, 'fltno': 'NA', 'visatype': 'NA'
+            })
+    print("Cleaning i94 data DONE.")
+
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"I94 data cleaning DONE in: {total_local}\n")
+
+    return i94_df_spark_clean
+
+def process_admissions_data(spark, PATHS, i94_df_spark_clean, start_time):
+    """Load input data (i94_clean) from input path,
         process the data to extract admissions table and
         store the prepered data to parquet files.
 
@@ -304,8 +358,42 @@ def process_admissions_data(spark, PATHS, start_str):
     * admissions_table  -- directory with parquet files
                             stored in output data path.
     """
+    start_local = datetime.now()
+    print("Creating admissions_table...")
+    # Create table + query
+    i94_df_spark_clean.createOrReplaceTempView("admissions_table_DF")
+    admissions_table = spark.sql("""
+        SELECT  DISTINCT admnum   AS admission_nbr,
+                         i94res   AS country_code,
+                         i94bir   AS age,
+                         i94visa  AS visa_code,
+                         visatype AS visa_type,
+                         gender   AS person_gender
+        FROM admissions_table_DF
+        ORDER BY country_code
+    """)
+    print("SCHEMA:")
+    admissions_table.printSchema()
+    print("DATA EXAMPLES:")
+    admissions_table.show(2, truncate=False)
+    # --------------------------------------------------------
+    print("Writing parquet files ...")
+    # Write DF to parquet file:
+    admissions_table_path = PATHS["output_data"] \
+                            + "admissions_table.parquet" \
+                            + "_" + start_time
+    print(f"OUTPUT: {admissions_table_path}")
+    admissions_table.write.mode("overwrite").parquet(admissions_table_path)
+    print("Writing admissions_table parquet files DONE.")
+    # --------------------------------------------------------
+    # Read parquet file back to Spark:
+    admissions_table_df = spark.read.parquet(admissions_table_path)
+    # --------------------------------------------------------
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"Creating admissions_table DONE in: {total_local}\n")
 
-    pass
+    return admissions_table_df
 
 def process_countries_data():
     pass
@@ -358,11 +446,24 @@ def main():
     # --------------------------------------------------------
     # Process input data to staging tables.
     i94_df_spark = process_i94_data(spark, PATHS, start_str)
-    airport_codes_i94_df_spark = process_i94_airport_data(spark, PATHS, start_str)
-    country_codes_i94_df_spark = process_i94_country_code_data(spark, PATHS, start_str)
+    airport_codes_i94_df_spark = process_i94_airport_data(  spark, \
+                                                            PATHS, \
+                                                            start_str)
+    country_codes_i94_df_spark = process_i94_country_code_data(spark, \
+                                                            PATHS, \
+                                                            start_str)
     # --------------------------------------------------------
+    # Cleaning the data:
+    i94_df_spark_clean = clean_i94_data(spark, \
+                                        PATHS, \
+                                        i94_df_spark, \
+                                        start_str)
+
     # Process Dimension tables.
-    #admissions_table = process_admissions_data(spark, PATHS, start_str)
+    admissions_table_df = process_admissions_data( spark, \
+                                                PATHS, \
+                                                i94_df_spark_clean, \
+                                                start_str)
     #countries_table = process_countries_data(spark, PATHS, start_str)
     #airports_table = process_airport_data(spark, PATHS, start_str)
     #time_table = process_time_data(spark, PATHS, start_str)
