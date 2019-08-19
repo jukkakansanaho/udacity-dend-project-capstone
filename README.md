@@ -71,7 +71,7 @@ The Fact Table can be used to answer for example the following question: Is ther
 
 DB schema is the following:
 
-![I94-ImmigrationInsights data schema as ER Diagram](./Udacity-DEND-Project-Capstone-ERD-20190815v8.png)
+![I94-ImmigrationInsights data schema as ER Diagram](./Udacity-DEND-Project-Capstone-ERD-20190819v9.png)
 
 _*I94-ImmigrationInsights schema as ER Diagram.*_
 

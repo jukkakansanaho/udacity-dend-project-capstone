@@ -251,18 +251,23 @@ def process_i94_country_code_data(spark, PATHS, start_time):
     # --------------------------------------------------------
     # Cleaning I94 Country Code data first
     cc = {"i94cit_clean": [],
-          "i94_country_name_clean": []
+          "i94_country_name_clean": [],
+          "iso_country_code_clean" : []
           }
     ccodes = []
     cnames = []
+    ccodes_iso = []
 
     for index, row in country_codes_i94_df.iterrows():
-        x = re.sub("'", "", row[0]).strip()
+        cname = re.sub("'", "", row[0]).strip()
+        ccode_iso = row[1]
         ccodes.append(index)
-        cnames.append(x)
+        cnames.append(cname)
+        ccodes_iso.append(ccode_iso)
 
     cc["i94cit_clean"] = ccodes
     cc["i94_country_name_clean"] = cnames
+    cc["iso_country_code_clean"] = ccodes_iso
 
     country_codes_i94_df_clean = pd.DataFrame.from_dict(cc)
     # --------------------------------------------------------
@@ -277,7 +282,8 @@ def process_i94_country_code_data(spark, PATHS, start_time):
     print("Reading I94 Country Code data to Spark...")
     country_codes_i94_schema = t.StructType([
                 t.StructField("i94_cit", t.StringType(), False),
-                t.StructField("i94_country_name", t.StringType(), False)
+                t.StructField("i94_country_name", t.StringType(), False),
+                t.StructField("iso_country_code", t.StringType(), False)
             ])
     country_codes_i94_df_spark = spark.createDataFrame(\
                                 country_codes_i94_df_clean, \
@@ -433,7 +439,9 @@ def process_countries_data(spark, PATHS, country_codes_i94_df_spark, start_time)
     # --------------------------------------------------------
     print("Writing parquet files ...")
     # Write DF to parquet file:
-    countries_table_path = PATHS["output_data"] + "countries_table.parquet" + "_" + start_time
+    countries_table_path = PATHS["output_data"] \
+                            + "countries_table.parquet" \
+                            + "_" + start_time
     print(f"OUTPUT: {countries_table_path}")
     countries_table.write.mode("overwrite").parquet(countries_table_path)
     print("Writing DONE.")
@@ -529,7 +537,7 @@ def process_time_data(spark, PATHS, i94_df_spark_clean, start_time):
         return (datetime(1960,1,1) + timedelta(days=arrdate_int))
 
     i94_df_spark_clean = i94_df_spark_clean\
-                        .withColumn("arrival_ts", \
+                        .withColumn("arrival_time", \
                                     get_timestamp(i94_df_spark_clean.arrdate))
     print("New column creation DONE.")
     # --------------------------------------------------------
@@ -538,15 +546,15 @@ def process_time_data(spark, PATHS, i94_df_spark_clean, start_time):
     # Extracting detailed data from arrival_ts
     i94_df_spark_clean.createOrReplaceTempView("time_table_DF")
     time_table = spark.sql("""
-        SELECT DISTINCT  arrival_ts             AS arrival_ts,
-                         hour(arrival_ts)       AS hour,
-                         day(arrival_ts)        AS day,
-                         weekofyear(arrival_ts) AS week,
-                         month(arrival_ts)      AS month,
-                         year(arrival_ts)       AS year,
-                         dayofweek(arrival_ts)  AS weekday
+        SELECT DISTINCT  arrival_time             AS arrival_ts,
+                         hour(arrival_time)       AS hour,
+                         day(arrival_time)        AS day,
+                         weekofyear(arrival_time) AS week,
+                         month(arrival_time)      AS month,
+                         year(arrival_time)       AS year,
+                         dayofweek(arrival_time)  AS weekday
         FROM time_table_DF
-        ORDER BY arrival_ts
+
     """)
 
     print("SCHEMA:")
@@ -560,7 +568,7 @@ def process_time_data(spark, PATHS, i94_df_spark_clean, start_time):
                             + "time_table.parquet" \
                             + "_" + start_time
     print(f"OUTPUT: {time_table_path}")
-    time_table.write.mode("overwrite")\
+    time_table.write.mode("overwrite").partitionBy("year", "month")\
                     .parquet(time_table_path)
     print("Writing time_table parquet files DONE.")
     # --------------------------------------------------------
@@ -578,6 +586,7 @@ def process_immigrations_data(spark, \
                               i94_df_spark_clean, \
                               country_codes_i94_df_spark, \
                               airport_codes_i94_df_spark, \
+                              time_table_df, \
                               start_time):
     """Load input data (i94_clean, country_code_clean,
         airport_codes_clean),
@@ -606,7 +615,10 @@ def process_immigrations_data(spark, \
                     country_codes_i94_df_spark.i94_cit))\
         .join(airport_codes_i94_df_spark, \
             (i94_df_spark_clean.i94port == \
-                    airport_codes_i94_df_spark.i94_port))
+                    airport_codes_i94_df_spark.i94_port))\
+        .join(time_table_df, \
+                    i94_df_spark_clean.arrival_time == \
+                    time_table_df.arrival_ts)
     # --------------------------------------------------------
     # Add new arrival_ts column
     print("Creating new immigration_id column...")
@@ -628,13 +640,17 @@ def process_immigrations_data(spark, \
                         .withColumn("departure_date", \
                             get_timestamp2(i94_df_spark_joined.depdate))
     print("New column creation DONE.")
+    print("i94_joined_SCHEMA:")
+    i94_df_spark_joined.printSchema()
     # --------------------------------------------------------
     print("Creating immigrations_table query...")
     # Create table + query
     i94_df_spark_joined.createOrReplaceTempView("immigrations_table_DF")
     immigrations_table = spark.sql("""
         SELECT DISTINCT  immigration_id AS immigration_id,
-                         arrival_ts     AS arrival_ts,
+                         arrival_time   AS arrival_time,
+                         year           AS arrival_year,
+                         month          AS arrival_month,
                          i94_port       AS airport_id,
                          i94_cit        AS country_code,
                          admnum         AS admission_nbr,
@@ -644,7 +660,7 @@ def process_immigrations_data(spark, \
                          fltno          AS flight_nbr
 
         FROM immigrations_table_DF immigrants
-        ORDER BY arrival_ts
+        ORDER BY arrival_time
     """)
 
     print("SCHEMA:")
@@ -659,6 +675,7 @@ def process_immigrations_data(spark, \
                                     + "_" + start_time
     print(f"OUTPUT: {immigrations_table_path}")
     immigrations_table.write.mode("overwrite")\
+                            .partitionBy("arrival_year", "arrival_month")\
                             .parquet(immigrations_table_path)
     print("Writing immigrations_table parquet files DONE.")
     # --------------------------------------------------------
@@ -748,13 +765,14 @@ def main():
                                             i94_df_spark_clean, \
                                             start_str)
 
-    # Process Fact table.
+    # # Process Fact table.
     immigrations_table = process_immigrations_data( \
                                     spark,
                                     PATHS, \
                                     i94_df_spark_clean, \
                                     country_codes_i94_df_spark, \
                                     airport_codes_i94_df_spark, \
+                                    time_table_df, \
                                     start_str)
     # --------------------------------------------------------
     print("Finished the ETL pipeline processing.")
