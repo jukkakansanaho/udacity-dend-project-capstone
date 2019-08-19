@@ -44,7 +44,7 @@ def process_config(config_all):
         PATHS["input_data"]        = config_all['LOCAL']['INPUT_DATA_LOCAL']
         PATHS["i94_data"]          = config_all['LOCAL']['INPUT_DATA_I94_LOCAL']
         PATHS["airport_codes"]     = config_all['LOCAL']['INPUT_DATA_AIRPORT_LOCAL']
-        PATHS["country_codes"]     = config_all['LOCAL']['INPUT_DATA_COUNTRY_LOCAL']
+        PATHS["country_codes_iso"] = config_all['LOCAL']['INPUT_DATA_COUNTRY_LOCAL']
         PATHS["airport_codes_i94"] = config_all['LOCAL']['INPUT_DATA_AIRPORT_I94_LOCAL']
         PATHS["country_codes_i94"] = config_all['LOCAL']['INPUT_DATA_COUNTRY_I94_LOCAL']
         PATHS["output_data"]       = config_all['LOCAL']['OUTPUT_DATA_LOCAL']
@@ -52,15 +52,15 @@ def process_config(config_all):
         PATHS["input_data"]        = config_all['SERVER']['INPUT_DATA_SERVER']
         PATHS["i94_data"]          = config_all['SERVER']['INPUT_DATA_I94_SERVER']
         PATHS["airport_codes"]     = config_all['SERVER']['INPUT_DATA_AIRPORT_SERVER']
-        PATHS["country_codes"]     = config_all['SERVER']['INPUT_DATA_COUNTRY_SERVER']
+        PATHS["country_codes_iso"] = config_all['SERVER']['INPUT_DATA_COUNTRY_SERVER']
         PATHS["airport_codes_i94"] = config_all['SERVER']['INPUT_DATA_AIRPORT_I94_SERVER']
         PATHS["country_codes_i94"] = config_all['SERVER']['INPUT_DATA_COUNTRY_I94_SERVER']
         PATHS["output_data"]       = config_all['SERVER']['OUTPUT_DATA_SERVER']
     elif config_all['COMMON']['DATA_LOCATION'] == "aws":
         PATHS["input_data"]        = config_all['AWS']['INPUT_DATA']
         PATHS["i94_data"]          = config_all['AWS']['INPUT_DATA_I94']
-        PATHS["airport_codes"]     = config_all['AWS']['INPUT_DATA_AIRPORT']
-        PATHS["country_codes"]     = config_all['AWS']['INPUT_DATA_COUNTRY']
+        PATHS["airport_codes"] = config_all['AWS']['INPUT_DATA_AIRPORT']
+        PATHS["country_codes_iso"]     = config_all['AWS']['INPUT_DATA_COUNTRY']
         PATHS["airport_codes_i94"] = config_all['AWS']['INPUT_DATA_AIRPORT_I94']
         PATHS["country_codes_i94"] = config_all['AWS']['INPUT_DATA_COUNTRY_I94']
         PATHS["output_data"]       = config_all['AWS']['OUTPUT_DATA']
@@ -313,9 +313,83 @@ def process_i94_country_code_data(spark, PATHS, start_time):
     # --------------------------------------------------------
     stop_local = datetime.now()
     total_local = stop_local - start_local
-    print(f"I94 Airport code processing DONE in: {total_local}\n")
+    print(f"I94 Country Code processing DONE in: {total_local}\n")
 
     return country_codes_i94_df_spark
+
+def process_iso_country_code_data(spark, PATHS, start_time):
+    """Load input data (ISO-3166 Country Codes) from input path,
+        read the data to Spark and
+        store the data to parquet staging files.
+
+    Keyword arguments:
+    * spark                 -- reference to Spark session.
+    * PATHS                 -- paths for input and output data.
+    * start_time            -- Datetime when the pipeline was started.
+                                Used for name parquet files.
+
+    Output:
+    * iso_country_codes_staging_table -- directory with parquet files
+                                        stored in output data path.
+    """
+    start_local = datetime.now()
+    print("Processing ISO-3166 Country Codes data ...")
+    # Read I94 Country codes data from XLS:
+    country_codes_iso_df = pd.read_csv(PATHS["country_codes_iso"], header=0)
+    # --------------------------------------------------------
+    # Writing clean data to CSV (might be needed at some point)
+    print("Writing ISO-3166 Country Code data to CSV...")
+    cc_path = PATHS["input_data"] + "/country_codes_iso_clean.csv"
+    country_codes_iso_df.to_csv(cc_path, sep=',')
+    print("Writing ISO-3166 Country Code data to CSV DONE.")
+    print("Cleaning ISO-3166 Country Code data DONE.")
+    # --------------------------------------------------------
+    # Read data to Spark
+    print("Reading ISO-3166 Country Code data to Spark...")
+    country_codes_iso_schema = t.StructType([
+                t.StructField("name", t.StringType(), False),
+                t.StructField("alpha_2", t.StringType(), False),
+                t.StructField("alpha_3", t.StringType(), False),
+                t.StructField("country_code", t.StringType(), False),
+                t.StructField("iso_3166_2", t.StringType(), False),
+                t.StructField("region", t.StringType(), True),
+                t.StructField("sub_region", t.StringType(), True),
+                t.StructField("intermediate_region", t.StringType(), True),
+                t.StructField("region_code", t.StringType(), True),
+                t.StructField("sub_region_code", t.StringType(), True),
+                t.StructField("intermediate_region_code", t.StringType(), True),
+            ])
+    country_codes_iso_df_spark = spark.createDataFrame(\
+                                country_codes_iso_df, \
+                                schema=country_codes_iso_schema)
+    # --------------------------------------------------------
+    # Print schema and data snippet
+    print("SCHEMA:")
+    country_codes_iso_df_spark.printSchema()
+    # print("DATA EXAMPLES:")
+    # #country_codes_iso_df_spark.show(2, truncate=False)
+    # --------------------------------------------------------
+    # Write ISO-3166 Country data to parquet file:
+    country_codes_iso_df_path = PATHS["output_data"] \
+                                + "country_codes_iso_staging.parquet" \
+                                + "_" + start_time
+    print(f"OUTPUT: {country_codes_iso_df_path}")
+    print("Writing parquet files ...")
+    country_codes_iso_df_spark.write.mode("overwrite")\
+                                .parquet(country_codes_iso_df_path)
+    print("Writing ISO-3166 Country Code staging files DONE.")
+    # --------------------------------------------------------
+    # Read parquet file back to Spark:
+    print("Reading parquet files back to Spark... ")
+    country_codes_iso_df_spark = spark.read.\
+                                 parquet(country_codes_iso_df_path)
+    print("Reading parquet files back to Spark DONE.")
+    # --------------------------------------------------------
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"ISO-3166 Country Code processing DONE in: {total_local}\n")
+
+    return country_codes_iso_df_spark
 
 def clean_i94_data(spark, PATHS, i94_df_spark, start_time):
     """Clean i94 data - fill-in empty/null values with "NA"s or 0s.
@@ -404,7 +478,11 @@ def process_admissions_data(spark, PATHS, i94_df_spark_clean, start_time):
 
     return admissions_table_df
 
-def process_countries_data(spark, PATHS, country_codes_i94_df_spark, start_time):
+def process_countries_data( spark, \
+                            PATHS, \
+                            country_codes_i94_df_spark, \
+                            country_codes_iso_df_spark, \
+                            start_time):
     """Load input data (country_codes_clean),
         process the data to extract countries table and
         store the prepered data to parquet files.
@@ -423,19 +501,38 @@ def process_countries_data(spark, PATHS, country_codes_i94_df_spark, start_time)
     """
     start_local = datetime.now()
     print("Creating countries_table...")
+
+    country_codes_i94_df_spark_joined = country_codes_i94_df_spark\
+        .join(country_codes_iso_df_spark, \
+            (country_codes_i94_df_spark.iso_country_code == \
+                    country_codes_iso_df_spark.country_code))
+
+    # print("SCHEMA_joined_table (before new table): ")
+    # country_codes_i94_df_spark_joined.printSchema()
+    country_codes_i94_df_spark_joined.show(20, truncate=False)
+
     # Create table + query
-    country_codes_i94_df_spark.createOrReplaceTempView("countries_table_DF")
+    country_codes_i94_df_spark_joined.createOrReplaceTempView("countries_table_DF")
     countries_table = spark.sql("""
-        SELECT  DISTINCT i94_cit          AS country_code,
-                         i94_country_name AS country_name
-        FROM countries_table_DF           AS countries
+        SELECT DISTINCT i94_cit          AS country_code,
+                        i94_country_name AS country_name,
+                        iso_country_code AS iso_ccode,
+                        alpha_2          AS iso_alpha_2,
+                        alpha_3          AS iso_alpha_3,
+                        iso_3166_2       AS iso_3166_2_code,
+                        name             AS iso_country_name,
+                        region           AS iso_region,
+                        sub_region       AS iso_sub_region,
+                        region_code      AS iso_region_code,
+                        sub_region_code  AS iso_sub_region_code
+        FROM countries_table_DF          AS countries
         ORDER BY country_name
     """)
 
     print("SCHEMA:")
     countries_table.printSchema()
-    #print("DATA EXAMPLES:")
-    #countries_table.show(2, truncate=False)
+    # print("DATA EXAMPLES:")
+    # countries_table.show(50, truncate=False)
     # --------------------------------------------------------
     print("Writing parquet files ...")
     # Write DF to parquet file:
@@ -733,6 +830,9 @@ def main():
     country_codes_i94_df_spark = process_i94_country_code_data(spark, \
                                                             PATHS, \
                                                             start_str)
+    country_codes_iso_df_spark = process_iso_country_code_data(spark, \
+                                                            PATHS, \
+                                                            start_str)
     # --------------------------------------------------------
     # Cleaning the data:
     i94_df_spark_clean = clean_i94_data(spark, \
@@ -751,6 +851,7 @@ def main():
                                             spark, \
                                             PATHS, \
                                             country_codes_i94_df_spark, \
+                                            country_codes_iso_df_spark, \
                                             start_str)
 
     airports_table_df = process_airport_data(\
@@ -765,7 +866,7 @@ def main():
                                             i94_df_spark_clean, \
                                             start_str)
 
-    # # Process Fact table.
+    # Process Fact table.
     immigrations_table = process_immigrations_data( \
                                     spark,
                                     PATHS, \
