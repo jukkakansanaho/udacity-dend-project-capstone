@@ -8,6 +8,6 @@ dl.cfg
 data/output_data/*
 data/GlobalLandTemperaturesByCity.csv
 data/GlobalLandTemperaturesByCountry.csv
-data/18-83510-I94-Data-2016/i94_jan16_sub.sas7bdat
+data/18-83510-I94-Data-2016/*
 data/~$*
 data/iso_3166_country_codes.xlsx

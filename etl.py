@@ -3,6 +3,7 @@ import pandas as pd
 import re
 from pyspark.sql import SparkSession
 import os
+import glob
 import configparser
 from datetime import datetime, timedelta
 from pyspark.sql import types as t
@@ -26,7 +27,7 @@ def create_spark_session():
     print("Spark session preparation DONE.")
 
     return spark
-
+# --------------------------------------------------------
 def process_config(config_all):
     """Prepare configs for the pipeline.
 
@@ -81,7 +82,88 @@ def process_config(config_all):
 
     return PATHS
 
-def process_i94_data(spark, PATHS, start_time):
+# --------------------------------------------------------
+def parse_input_files(PATHS, path, extension, start_str):
+    """Parse recursively all input files from given directory path.
+
+    Keyword arguments:
+    * PATHS     -- PATHS variable with all.
+    * path      -- path to parse.
+    * extension -- file extension to look for.
+
+    Output:
+    * all_files -- List of all valid input files found.
+    """
+    print(f"PATH: {path}")
+    print(f"EXTENSION: {extension}")
+    # Get (from directory) the files matching extension
+    all_files = []
+    for root, dirs, files in os.walk(path):
+        files = glob.glob(os.path.join(root, extension))
+        for f in files :
+            all_files.append(os.path.abspath(f))
+
+    return all_files
+
+# --------------------------------------------------------
+def reorder_paths(filepaths):
+    """Reorder all input files Jan -> Dec.
+
+    Keyword arguments:
+    * filepath  -- List of all filepaths.
+
+    Output:
+    * reordered_paths_list_clean -- Ordered lisat of all inout files.
+    """
+    reordered_paths_list = \
+        ["01","02","03","04","05","06","07","08","09","10","11","12"]
+
+    for path in filepaths:
+        month, year = parse_year_and_month(path)
+        month_order = {
+            "jan": 0,
+            "feb": 1,
+            "mar": 2,
+            "apr": 3,
+            "may": 4,
+            "jun": 5,
+            "jul": 6,
+            "aug": 7,
+            "sep": 8,
+            "oct": 9,
+            "nov": 10,
+            "dec": 11
+        }
+        loc = month_order.get(month)
+        reordered_paths_list[loc] = path
+
+    reordered_paths_list_clean = []
+    for str in reordered_paths_list:
+        if len(str) != 2:
+            reordered_paths_list_clean.append(str)
+        else:
+            pass
+
+    return reordered_paths_list_clean
+
+# --------------------------------------------------------
+def parse_year_and_month(filepath):
+    """Parse year and month out from the file name.
+
+    Keyword arguments:
+    * filepath  -- List of all filepaths.
+
+    Output:
+    * month, year -- Month and year of the input file
+                    (based on file name).
+    """
+    month = filepath[-18:-15]
+    year = filepath[-15:-13]
+
+    return month, year
+
+# --------------------------------------------------------
+def process_i94_data(spark, PATHS, filepath, start_time):
     """Load input data (i94) from input path,
         read the data to Spark and
         store the data to parquet staging files.
@@ -98,10 +180,14 @@ def process_i94_data(spark, PATHS, start_time):
     """
     start_local = datetime.now()
     print("Processing i94 data ...")
+
+    month, year = parse_year_and_month(filepath)
+    print(f"YEAR+MONTH: {year} - {month}")
+
     # Read data to Spark
     i94_df_spark =spark.read\
                         .format('com.github.saurfang.sas.spark')\
-                        .load(PATHS["i94_data"])
+                        .load(filepath)
 
     # Print schema and data snippet
     print("SCHEMA:")
@@ -111,7 +197,9 @@ def process_i94_data(spark, PATHS, start_time):
 
     # Write data to parquet file:
     i94_df_path = PATHS["output_data"] \
-                    + "i94_staging.parquet" \
+                    + "i94_staging" \
+                    + "_" + year + "_" + month + "_" \
+                    + ".parquet" \
                     + "_" + start_time
     print(f"OUTPUT: {i94_df_path}")
     print("Writing parquet files ...")
@@ -129,6 +217,7 @@ def process_i94_data(spark, PATHS, start_time):
 
     return i94_df_spark
 
+# --------------------------------------------------------
 def process_i94_airport_data(spark, PATHS, start_time):
     """Load input data (i94 airports) from input path,
         read the data to Spark and
@@ -228,6 +317,7 @@ def process_i94_airport_data(spark, PATHS, start_time):
 
     return airport_codes_i94_df_spark
 
+# --------------------------------------------------------
 def process_i94_country_code_data(spark, PATHS, start_time):
     """Load input data (i94 Country Codes) from input path,
         read the data to Spark and
@@ -317,6 +407,7 @@ def process_i94_country_code_data(spark, PATHS, start_time):
 
     return country_codes_i94_df_spark
 
+# --------------------------------------------------------
 def process_iso_country_code_data(spark, PATHS, start_time):
     """Load input data (ISO-3166 Country Codes) from input path,
         read the data to Spark and
@@ -391,6 +482,7 @@ def process_iso_country_code_data(spark, PATHS, start_time):
 
     return country_codes_iso_df_spark
 
+# --------------------------------------------------------
 def clean_i94_data(spark, PATHS, i94_df_spark, start_time):
     """Clean i94 data - fill-in empty/null values with "NA"s or 0s.
 
@@ -423,6 +515,7 @@ def clean_i94_data(spark, PATHS, i94_df_spark, start_time):
 
     return i94_df_spark_clean
 
+# --------------------------------------------------------
 def process_admissions_data(spark, PATHS, i94_df_spark_clean, start_time):
     """Load input data (i94_clean),
         process the data to extract admissions table and
@@ -478,6 +571,7 @@ def process_admissions_data(spark, PATHS, i94_df_spark_clean, start_time):
 
     return admissions_table_df
 
+# --------------------------------------------------------
 def process_countries_data( spark, \
                             PATHS, \
                             country_codes_i94_df_spark, \
@@ -553,6 +647,7 @@ def process_countries_data( spark, \
 
     return countries_table_df
 
+# --------------------------------------------------------
 def process_airport_data(spark, PATHS, airport_codes_i94_df_spark, start_time):
     """Load input data (airport_codes_clean),
         process the data to extract airports table and
@@ -606,6 +701,7 @@ def process_airport_data(spark, PATHS, airport_codes_i94_df_spark, start_time):
 
     return airports_table_df
 
+# --------------------------------------------------------
 def process_time_data(spark, PATHS, i94_df_spark_clean, start_time):
     """Load input data (i94_clean),
         process the data to extract time table and
@@ -678,6 +774,7 @@ def process_time_data(spark, PATHS, i94_df_spark_clean, start_time):
 
     return time_table_df, i94_df_spark_clean
 
+# --------------------------------------------------------
 def process_immigrations_data(spark, \
                               PATHS, \
                               i94_df_spark_clean, \
@@ -785,6 +882,7 @@ def process_immigrations_data(spark, \
 
     return immigrations_table_df
 
+# --------------------------------------------------------
 def main():
     """Load input data (I94 Immigration data) from input_data path,
         process the data to extract dimension and fact tables,
@@ -822,59 +920,70 @@ def main():
     # Create Spark session for the pipeline.
     spark = create_spark_session()
     # --------------------------------------------------------
-    # Process input data to staging tables.
-    i94_df_spark = process_i94_data(spark, PATHS, start_str)
-    airport_codes_i94_df_spark = process_i94_airport_data(  spark, \
-                                                            PATHS, \
-                                                            start_str)
-    country_codes_i94_df_spark = process_i94_country_code_data(spark, \
-                                                            PATHS, \
-                                                            start_str)
-    country_codes_iso_df_spark = process_iso_country_code_data(spark, \
-                                                            PATHS, \
-                                                            start_str)
-    # --------------------------------------------------------
-    # Cleaning the data:
-    i94_df_spark_clean = clean_i94_data(spark, \
-                                        PATHS, \
-                                        i94_df_spark, \
-                                        start_str)
-
-    # Process Dimension tables.
-    admissions_table_df = process_admissions_data(\
-                                            spark, \
-                                            PATHS, \
-                                            i94_df_spark_clean, \
-                                            start_str)
-
-    countries_table_df = process_countries_data(\
-                                            spark, \
-                                            PATHS, \
-                                            country_codes_i94_df_spark, \
-                                            country_codes_iso_df_spark, \
-                                            start_str)
-
-    airports_table_df = process_airport_data(\
-                                            spark, \
-                                            PATHS, \
-                                            airport_codes_i94_df_spark, \
-                                            start_str)
-
-    time_table_df, i94_df_spark_clean = process_time_data( \
-                                            spark, \
-                                            PATHS, \
-                                            i94_df_spark_clean, \
-                                            start_str)
-
-    # Process Fact table.
-    immigrations_table = process_immigrations_data( \
-                                    spark,
-                                    PATHS, \
-                                    i94_df_spark_clean, \
-                                    country_codes_i94_df_spark, \
-                                    airport_codes_i94_df_spark, \
-                                    time_table_df, \
+    # Parse input data dir
+    input_files = parse_input_files(PATHS, \
+                                    PATHS["i94_data"], \
+                                    "*.sas7bdat", \
                                     start_str)
+    input_files_reordered = reorder_paths(input_files)
+    PATHS["i94_files"] = input_files_reordered
+    print(f"i94_files: {PATHS['i94_files']}")
+    # --------------------------------------------------------
+    # Process all input
+    for filepath in PATHS["i94_files"]:
+        # Process input data to staging tables.
+        i94_df_spark = process_i94_data(spark, PATHS, filepath, start_str)
+        airport_codes_i94_df_spark = process_i94_airport_data(  spark, \
+                                                                PATHS, \
+                                                                start_str)
+        country_codes_i94_df_spark = process_i94_country_code_data(spark, \
+                                                                PATHS, \
+                                                                start_str)
+        country_codes_iso_df_spark = process_iso_country_code_data(spark, \
+                                                                PATHS, \
+                                                                start_str)
+        # --------------------------------------------------------
+        # Cleaning the data:
+        i94_df_spark_clean = clean_i94_data(spark, \
+                                            PATHS, \
+                                            i94_df_spark, \
+                                            start_str)
+
+        # Process Dimension tables.
+        admissions_table_df = process_admissions_data(\
+                                                spark, \
+                                                PATHS, \
+                                                i94_df_spark_clean, \
+                                                start_str)
+
+        countries_table_df = process_countries_data(\
+                                                spark, \
+                                                PATHS, \
+                                                country_codes_i94_df_spark, \
+                                                country_codes_iso_df_spark, \
+                                                start_str)
+
+        airports_table_df = process_airport_data(\
+                                                spark, \
+                                                PATHS, \
+                                                airport_codes_i94_df_spark, \
+                                                start_str)
+
+        time_table_df, i94_df_spark_clean = process_time_data( \
+                                                spark, \
+                                                PATHS, \
+                                                i94_df_spark_clean, \
+                                                start_str)
+
+        # Process Fact table.
+        immigrations_table = process_immigrations_data( \
+                                        spark,
+                                        PATHS, \
+                                        i94_df_spark_clean, \
+                                        country_codes_i94_df_spark, \
+                                        airport_codes_i94_df_spark, \
+                                        time_table_df, \
+                                        start_str)
     # --------------------------------------------------------
     print("Finished the ETL pipeline processing.")
     print("ALL DONE.")
@@ -883,6 +992,7 @@ def main():
     print("FINISHED ETL pipeline (to process song_data and log_data) at {}"\
             .format(stop))
     print("TOTAL TIME: {}".format(stop-start))
+
 
 if __name__ == "__main__":
     main()
