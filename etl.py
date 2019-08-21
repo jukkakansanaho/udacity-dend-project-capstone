@@ -603,7 +603,7 @@ def process_countries_data( spark, \
 
     # print("SCHEMA_joined_table (before new table): ")
     # country_codes_i94_df_spark_joined.printSchema()
-    country_codes_i94_df_spark_joined.show(20, truncate=False)
+    # country_codes_i94_df_spark_joined.show(20, truncate=False)
 
     # Create table + query
     country_codes_i94_df_spark_joined.createOrReplaceTempView("countries_table_DF")
@@ -761,7 +761,7 @@ def process_time_data(spark, PATHS, i94_df_spark_clean, start_time):
                             + "time_table.parquet" \
                             + "_" + start_time
     print(f"OUTPUT: {time_table_path}")
-    time_table.write.mode("overwrite").partitionBy("year", "month")\
+    time_table.write.mode("append").partitionBy("year", "month")\
                     .parquet(time_table_path)
     print("Writing time_table parquet files DONE.")
     # --------------------------------------------------------
@@ -868,7 +868,7 @@ def process_immigrations_data(spark, \
                                     + "immigrations_table.parquet" \
                                     + "_" + start_time
     print(f"OUTPUT: {immigrations_table_path}")
-    immigrations_table.write.mode("overwrite")\
+    immigrations_table.write.mode("append")\
                             .partitionBy("arrival_year", "arrival_month")\
                             .parquet(immigrations_table_path)
     print("Writing immigrations_table parquet files DONE.")
@@ -882,6 +882,214 @@ def process_immigrations_data(spark, \
 
     return immigrations_table_df
 
+# --------------------------------------------------------
+def check_data_quality( spark, \
+                        round_ts, \
+                        admissions_table_df, \
+                        countries_table_df,
+                        airports_table_df, \
+                        time_table_df, \
+                        immigrations_table_df, \
+                        start_time):
+    """Check data quality of all dimension and fact tables.
+
+    Keyword arguments:
+    * admissions_table   -- directory with admissions_table parquet files
+                          stored in output_data path.
+    * countries_table    -- directory with countries_table parquet files
+                          stored in output_data path.
+    * airports_table     -- directory with airports_table parquet files
+                          stored in output_data path.
+    * time_table         -- directory with time_table parquet files
+                          stored in output_data path.
+    * immigrations_table -- directory with immigrations_table parquet files
+                          stored in output_data path.
+
+    Output:
+    *
+    """
+    start_local = datetime.now()
+    print("Start processing data quality checks...")
+    results = { "round_ts": round_ts,
+                "admissions_count": 0,
+                "admissions": "",
+                "countries_count": 0,
+                "countries": "",
+                "airports_count": 0,
+                "airports": "",
+                "time_count": 0,
+                "time": "",
+                "immigrations_count": 0,
+                "immigrations": ""}
+    # --------------------------------------------------------
+    # CHECK admissions table:
+    # Check that key fields have valid values (no nulls or empty)
+    print("Checking admissions table...")
+    admissions_table_df.createOrReplaceTempView("admissions_table_DF")
+    admissions_table_check1 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM admissions_table_DF
+        WHERE   admission_nbr IS NULL OR admission_nbr == "" OR
+                country_code IS NULL OR country_code == ""
+    """)
+
+    # Check that table has > 0 rows
+    admissions_table_df.createOrReplaceTempView("admissions_table_DF")
+    admissions_table_check2 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM admissions_table_DF
+    """)
+    if admissions_table_check1.collect()[0][0] > 0 \
+        & admissions_table_check2.collect()[0][0] < 1:
+        results['admissions_count'] = admissions_table_check2.collect()[0][0]
+        results['admissions'] = "NOK"
+    else:
+        results['admissions_count'] = admissions_table_check2.collect()[0][0]
+        results['admissions'] = "OK"
+
+    print("NULLS:")
+    admissions_table_check1.show(1)
+    print("ROWS:")
+    admissions_table_check2.show(1)
+    # --------------------------------------------------------
+    # CHECK countries table:
+    # Check that key fields have valid values (no nulls or empty)
+    print("Checking countries table...")
+    countries_table_df.createOrReplaceTempView("countries_table_DF")
+    countries_table_check1 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM countries_table_DF
+        WHERE   country_code IS NULL OR country_code == "" OR
+                country_name IS NULL OR country_name == "" OR
+                iso_ccode IS NULL OR iso_ccode == "" OR
+                iso_alpha_2 IS NULL OR iso_alpha_2 == "" OR
+                iso_alpha_3 IS NULL OR iso_alpha_3 == "" OR
+                iso_3166_2_code IS NULL OR iso_3166_2_code == "" OR
+                iso_country_name IS NULL OR iso_country_name == ""
+    """)
+
+    # Check that table has > 0 rows
+    countries_table_df.createOrReplaceTempView("countries_table_DF")
+    countries_table_check2 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM countries_table_DF
+    """)
+
+    if countries_table_check1.collect()[0][0] > 0 \
+        & countries_table_check2.collect()[0][0] < 1:
+        results['countries_count'] = countries_table_check2.collect()[0][0]
+        results['countries'] = "NOK"
+    else:
+        results['countries_count'] = countries_table_check2.collect()[0][0]
+        results['countries'] = "OK"
+
+    print("NULLS:")
+    countries_table_check1.show(1)
+    print("ROWS:")
+    countries_table_check2.show(1)
+    # --------------------------------------------------------
+    # CHECK airports table:
+    # Check that key fields have valid values (no nulls or empty)
+    print("Checking airports table...")
+    airports_table_df.createOrReplaceTempView("airports_table_DF")
+    airports_table_check1 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM airports_table_DF
+        WHERE   airport_id IS NULL OR airport_id == "" OR
+                airport_name IS NULL OR airport_name == ""
+    """)
+
+    # Check that table has > 0 rows
+    airports_table_df.createOrReplaceTempView("airports_table_DF")
+    airports_table_check2 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM airports_table_DF
+    """)
+
+    if airports_table_check1.collect()[0][0] > 0 \
+        & airports_table_check2.collect()[0][0] < 1:
+        results['airports_count'] = airports_table_check2.collect()[0][0]
+        results['airports'] = "NOK"
+    else:
+        results['airports_count'] = airports_table_check2.collect()[0][0]
+        results['airports'] = "OK"
+
+    print("NULLS:")
+    airports_table_check1.show(1)
+    print("ROWS:")
+    airports_table_check2.show(1)
+    # --------------------------------------------------------
+    # CHECK time table:
+    # Check that key fields have valid values (no nulls or empty)
+    print("Checking time table...")
+    time_table_df.createOrReplaceTempView("time_table_DF")
+    time_table_check1 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM time_table_DF
+        WHERE   arrival_ts IS NULL OR arrival_ts == ""
+    """)
+
+
+    # Check that table has > 0 rows
+    time_table_df.createOrReplaceTempView("time_table_DF")
+    time_table_check2 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM time_table_DF
+    """)
+    if time_table_check1.collect()[0][0] > 0 \
+        & time_table_check2.collect()[0][0] < 1:
+        results['time_count'] = time_table_check2.collect()[0][0]
+        results['time'] = "NOK"
+    else:
+        results['time_count'] = time_table_check2.collect()[0][0]
+        results['time'] = "OK"
+
+    print("NULLS:")
+    time_table_check1.show(1)
+    print("ROWS:")
+    time_table_check2.show(1)
+    # --------------------------------------------------------
+    # CHECK immigrations table:
+    # Check that key fields have valid values (no nulls or empty)
+    print("Checking immigrations table...")
+    immigrations_table_df.createOrReplaceTempView("immigrations_table_DF")
+    immigrations_table_check1 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM immigrations_table_DF
+        WHERE   immigration_id IS NULL OR immigration_id == "" OR
+                arrival_time IS NULL OR arrival_time == "" OR
+                arrival_year IS NULL OR arrival_year == "" OR
+                arrival_month IS NULL OR arrival_month == "" OR
+                airport_id IS NULL OR airport_id == "" OR
+                country_code IS NULL OR country_code == "" OR
+                admission_nbr IS NULL OR admission_nbr == ""
+    """)
+
+    # Check that table has > 0 rows
+    immigrations_table_df.createOrReplaceTempView("immigrations_table_DF")
+    immigrations_table_check2 = spark.sql("""
+        SELECT  COUNT(*)
+        FROM immigrations_table_DF
+    """)
+
+    if immigrations_table_check1.collect()[0][0] > 0 \
+        & immigrations_table_check2.collect()[0][0] < 1:
+        results['immigrations_count'] = immigrations_table_check2.collect()[0][0]
+        results['immigrations'] = "NOK"
+    else:
+        results['immigrations_count'] = immigrations_table_check2.collect()[0][0]
+        results['immigrations'] = "OK"
+
+    print("NULLS:")
+    immigrations_table_check1.show(1)
+    print("ROWS:")
+    immigrations_table_check2.show(1)
+    # --------------------------------------------------------
+    stop_local = datetime.now()
+    total_local = stop_local - start_local
+    print(f"Checking data quality DONE in: {total_local}\n")
+
+    return results
 # --------------------------------------------------------
 def main():
     """Load input data (I94 Immigration data) from input_data path,
@@ -908,6 +1116,7 @@ def main():
     start_str = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')
     print("\nSTARTED ETL pipeline (to process I94 Immigrations data). \
             at {}\n".format(start))
+    results_all = []
     # --------------------------------------------------------
     # Prepare configs for the pipeline.
     config_all = configparser.ConfigParser()
@@ -930,7 +1139,9 @@ def main():
     print(f"i94_files: {PATHS['i94_files']}")
     # --------------------------------------------------------
     # Process all input
+    round = 0
     for filepath in PATHS["i94_files"]:
+        round_ts = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')
         # Process input data to staging tables.
         i94_df_spark = process_i94_data(spark, PATHS, filepath, start_str)
         airport_codes_i94_df_spark = process_i94_airport_data(  spark, \
@@ -976,7 +1187,7 @@ def main():
                                                 start_str)
 
         # Process Fact table.
-        immigrations_table = process_immigrations_data( \
+        immigrations_table_df = process_immigrations_data( \
                                         spark,
                                         PATHS, \
                                         i94_df_spark_clean, \
@@ -984,10 +1195,24 @@ def main():
                                         airport_codes_i94_df_spark, \
                                         time_table_df, \
                                         start_str)
-    # --------------------------------------------------------
-    print("Finished the ETL pipeline processing.")
-    print("ALL DONE.")
 
+        print("Checking data quality of created tables.")
+        results = check_data_quality( spark, \
+                                      round_ts, \
+                                      admissions_table_df, \
+                                      countries_table_df,
+                                      airports_table_df, \
+                                      time_table_df, \
+                                      immigrations_table_df, \
+                                      start_str)
+        results_all.append(results)
+        print("Data quality checks DONE.")
+    print("Finished the ETL pipeline processing.")
+    print("RESULTS: ")
+    print(results_all)
+    # --------------------------------------------------------
+
+    print("ALL work in ETL pipeline is now DONE.")
     stop = datetime.now()
     print("FINISHED ETL pipeline (to process song_data and log_data) at {}"\
             .format(stop))

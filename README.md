@@ -1,4 +1,4 @@
-_(Udacity: Data Engineering Nano Degree) | jukka.kansanaho@gmail.com | 2019-08-14_
+_(Udacity: Data Engineering Nano Degree) | jukka.kansanaho@gmail.com | 2019-08-21_
 
 # PROJECT-CAPSTONE: US I94 Immigration Insights
 
@@ -66,12 +66,12 @@ Project builds an ETL pipeline (Extract, Transform, Load) to Extract data from i
 
 ## About Database
 
-Weather and Emission analytics database schema has a star design. Start design means that it has one Fact Table having business data, and supporting Dimension Tables. Star DB design is maybe the most common schema used in ETL pipelines since it separates Dimension data into their own tables in a clean way and collects business critical data into the Fact table allowing flexible queries.
-The Fact Table can be used to answer for example the following question: Is there correlation between countries' emissions and temperature.
+US I94 Immigrants Insights database schema has a star design. Start design means that it has one Fact Table having business data, and supporting Dimension Tables. Star DB design is maybe the most common schema used in ETL pipelines since it separates Dimension data into their own tables in a clean way and collects business critical data into the Fact table allowing flexible queries.
+The Fact Table can be used to answer for example the following question: How much different nationalities came to US through which airport.
 
 DB schema is the following:
 
-![I94-ImmigrationInsights data schema as ER Diagram](./Udacity-DEND-Project-Capstone-ERD-20190819v9.png)
+![I94-ImmigrationInsights data schema as ER Diagram](./Udacity-DEND-Project-Capstone-ERD-20190820v11.png)
 
 _*I94-ImmigrationInsights schema as ER Diagram.*_
 
@@ -79,17 +79,11 @@ _*I94-ImmigrationInsights schema as ER Diagram.*_
 
 Purpose of this Data Lake based ETL pipeline solution is to automate data cleaning, processing and analysis steps for various weather data sources.
 
-### Raw JSON data structures
+### Data Dictionary
 
-* **...**: ...
+You can find details about the DB schema dictionary dictionary from [data_dictionary.json](./data_dictionary.json) file. This file describes all the DB fields and their source.
 
-### Fact Table
-
-* **...**: ...
-
-### Dimension Tables
-
-* **...**: ...
+---
 
 ## About ETL pipeline design
 
