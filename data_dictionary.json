@@ -44,12 +44,57 @@
         {
           "field_name": "country_code",
           "field_description":
-            "US I94 Country Code (i94cit or i94res). NOTE: these codes are different than defined in ISO-3166 standard for country codes."
+            "US I94 Country Code (i94cit or i94res). e.g. 582 (Mexico). NOTE: these codes are different than defined in ISO-3166 standard for country codes."
         },
         {
           "field_name": "country_name",
           "field_description":
-            "3 letter country code (i94cit or i94res) used in I94 data to identify the immigrant country."
+            "US I94 Country Name (i94_country_name) used in I94 data to identify the immigrant country. E.g. Finland"
+        },
+        {
+          "field_name": "iso_ccode",
+          "field_description":
+            "A number identifying country in ISO-3166 standard. E.g. 76 (Brazil)"
+        },
+        {
+          "field_name": "iso_alpha_2",
+          "field_description":
+            "2 letter code identifying country in ISO-3166 standard. E.g. BR (Brazil)"
+        },
+        {
+          "field_name": "iso_alpha_3",
+          "field_description":
+            "3 letter code identifying country in ISO-3166 standard. E.g. BRA (Brazil)"
+        },
+        {
+          "field_name": "iso_3166_2",
+          "field_description":
+            "ISO code identifying country in ISO-3166 standard. E.g. ISO 3166-2:BR (Brazil)"
+        },
+        {
+          "field_name": "iso_country_name",
+          "field_description":
+            "Country name defined in ISO-3166 standard. E.g. Brazil"
+        },
+        {
+          "field_name": "iso_country_region",
+          "field_description":
+            "Country's region in ISO-3166 standard. E.g. Europa, Asia, Americas."
+        },
+        {
+          "field_name": "iso_sub_region",
+          "field_description":
+            "Country's sub-region in ISO-3166 standard. E.g. Western Europe, Western Asia, Northern America."
+        },
+        {
+          "field_name": "iso_region_code",
+          "field_description":
+            "Country's region code (number) in ISO-3166 standard. E.g. 19 (Latin America)"
+        },
+        {
+          "field_name": "iso_sub_region_code",
+          "field_description":
+            "Country's sub-region code (number) in ISO-3166 standard. E.g. 419 (Latin America and the Caribbean)"
         }
       ]
     },
@@ -61,11 +106,12 @@
         {
           "field_name": "airport_id",
           "field_description":
-            "US I94 Airport ID (i94port). NOTE: these codes are different than used world wide e.g. IATA standard for airport ids."
+            "US I94 Airport ID (i94port). E.g. LOS (Los Angeles). NOTE: these codes are different than used world wide e.g. IATA standard for airport ids."
         },
         {
           "field_name": "airport_name",
-          "field_description": "Name of the airport used in I94 data."
+          "field_description":
+            "Name of the airport used in I94 data. E.g. Los Angeles"
         },
         {
           "field_name": "airport_state",
@@ -115,7 +161,7 @@
         {
           "field_name": "immigrations_id",
           "field_description":
-            "Primary key. Generated ID for the immigration event."
+            "Primary key. Generated ID for the immigration event. E.g. 154618828633"
         },
         {
           "field_name": "arrival_ts",
@@ -145,16 +191,17 @@
         {
           "field_name": "departure_date",
           "field_description":
-            "Timestamp of the day the immigrant left US. May be empty (NA) which means that the prsons has not left US."
+            "Timestamp of the day the immigrant left US. May be empty (marked as NA) which means that the prsons has not left US."
         },
         {
           "field_name": "airline",
-          "field_description": "Airline immigrant used when entrying US."
+          "field_description":
+            "Airline immigrant used when entrying US. Maybe be empty (marked as NA)."
         },
         {
           "field_name": "flight_nbr",
           "field_description":
-            "Airline flight number immigrant used when etrying US."
+            "Airline flight number immigrant used when etrying US. Maybe be empty (marked as NA)"
         }
       ]
     }

@@ -83,7 +83,13 @@ Purpose of this Data Lake based ETL pipeline solution is to automate data cleani
 
 You can find details about the DB schema dictionary dictionary from [data_dictionary.json](./data_dictionary.json) file. This file describes all the DB fields and their source.
 
----
+### Findings about input data
+
+US I94 Immigration data set (used in this project) consists of 12 sas7bdat files for year 2016 - each per month. There are several non-standard codes only used in I94 data, which made combining the date to other data sets hard.
+
+* I94_SAS_Labels_Descriptions [I94_SAS_Labels_Descriptions](./data/I94_SAS_Labels_Descriptions.txt) file content was used to manually copy-paste the descriptions of country and airport information to XLS file, mapping I94 country codes to ISO-3166 country codes, and from there further processing it as a part of the ETL pipeline. This allows to combine e.g. ISO-3166 data set into DB's countries table.
+* I94 Immigration data set doesn't identify immigrants on a very detailed level => only some information was possible to extract from the data into admissions table.
+* Potential further work: map I94 airport codes to IATA airport codes => combine IATA airport data set into the DB's airports table.
 
 ## About ETL pipeline design
 
@@ -109,7 +115,7 @@ Project-Capstone contains the following configuration files:
 Also, the following libraries are needed for the python environment to make Jupyter Notebook and Apache Spark to work:
 
 * _pyspark_ (+ dependencies) to enable script to create a SparkSession. (See https://spark.apache.org/docs/latest/api/python/pyspark.sql.html)
-* NOTE: in the beginning of the execution, script downloads hadoop-aws package to enable connection to AWS.
+* NOTE: in the beginning of the execution, script downloads saurfang:spark-sas7bdat package to enable Spark to process SAS files.
 
 * _pandas_ to read some of the input files into a format that Spark can understand.
 
@@ -119,13 +125,54 @@ Type to command line:
 
 `python3 etl.py`
 
-* ...
+* First, ETL script reads in configuration settings (dl.cfg). Script also re-orders I94 inout files to process them in right order (Jan => Dec).
+* ETL script takes input data (I94 data, I94 country data, I94 airport data, ISO-3166 country data, IATA airport data).
+* Raw input data is read into pandas dataframe, and from there to Spark dataframe and stored into parquet staging files.
+* Staging parquet files are read back to Spark dataframes and cleaned (when necessary) and some further data is extracted from the original data.
+* Each star schema table is processed in order: admissions => countries => airports => time => immigrations
+* Finally, data quality checks are run for each table to validate the output (key columns don't have nulls, each table has content). A summary of the quality check is provided and written in console.
+* During the execution, ETL script prints out information about the progress of the script execution.
 
-Output: ...
+---
 
-## Example queries
+## Project write-up
 
-* ...
+**Rationale for the tools selection:**
+
+* Python, Pandas and Spark were natural choises to process project's input data since it contains all necessary (and easy to use) libraries to read, clean, process, and form DB tables.
+* Since the data set was still limited, local and server storage was used in storing, reading, writing the input and output data.
+* Input data could have been stored in AWS without big problems (excluded in this project).
+* Output data could have been easily written to AWS after processing (excluded in this project). Experiences have shown that it's better to write parquet files locally first and only after that write them to cloud storage (as a bulk operation) to avoid delays and extra costs caused by AWS S3.
+
+**How often ETL script should be run:**
+
+* ETL script should be run monthly basis (assuming that new I94 data is available once per month).
+
+**Other scenarions (what to consider in them):**
+
+* Data is 100x:
+  * Input data should be stoted in cloud storage e.g. AWS S3
+  * Clustered Spark should be used to enable parallel processing of the data.
+  * Clustered Cloud DB e.g. AWS Redshift should be used to store the data during the processing (staging and final tables).
+  * Output data (parquet files) should be stored to Cloud storage e.g. AWS S3 for easy access or to a Cloud DB for further analysis. AWS Redshift is very expensive for storing the data, so maybe some SQL DB (e.g. AWS RDS) should be used.
+* Data is used in dashboard and updated every day 07:00AM:
+
+  * ETl script should be refactored to process only the changed inout information instead of processing all the inout files as it does now to minimise the used time and computing resources.
+  * Output data should be stored and updated in a Cloud DB (e.g. AWS RDS) to make it available all times for the dashboard.
+  * Possibly this "always available" DB (serving the dashboard) would contain a latest sub-set of all available data to make it fast performing and easier to manage.
+
+* DB is accessed by 100+ people:
+  * Output data should be stored in a Cloud DB (e.g. AWS RDS) to make it "always available" for further analysis. Tools should be provided for the end-users to access the output DB.
+  * Potentially, some new tables could be created to serve the most used queries better.
+
+**Potential further work:**
+
+* ETL pipeline script could be re-factored
+  * make it more modular (split functions to separate files/classes)
+  * combine functions to have fewer, more general purpose functions instead of several specific function per ETL steps
+* IATA airport data could be (semi-manually) mapped to I94 airport data to add more value for the analysis and enable further data merges.
+
+* Other data e.g. daily weather data could be combined as inout data to provide insights about the weather immigrants experienced when they entered US.
 
 ## Summary
 
