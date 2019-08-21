@@ -170,6 +170,9 @@ Type to command line:
 * ETL pipeline script could be re-factored
   * make it more modular (split functions to separate files/classes)
   * combine functions to have fewer, more general purpose functions instead of several specific function per ETL steps
+  * UDFs (User Defined Functions) in process_time_data() and process_immigrations_data() functions
+    * UDFs are used to generate timestamps from SAS timestamps
+    * UDFs are killing the performance of the ETL script => UDFs should be replaced with some other way to make script perform better.
 * IATA airport data could be (semi-manually) mapped to I94 airport data to add more value for the analysis and enable further data merges.
 
 * Other data e.g. daily weather data could be combined as inout data to provide insights about the weather immigrants experienced when they entered US.
